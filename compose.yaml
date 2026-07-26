@@ -14,6 +14,8 @@ x-app: &app
     depends_on:
         migrate:
             condition: service_completed_successfully
+        redis:
+            condition: service_healthy
     networks:
         - cashwise
     restart: unless-stopped
@@ -134,11 +136,6 @@ services:
     queue:
         <<: *app
         command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
-        depends_on:
-            migrate:
-                condition: service_completed_successfully
-            redis:
-                condition: service_healthy
         healthcheck:
             disable: true
 
