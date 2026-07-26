@@ -1,0 +1,152 @@
+x-app: &app
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: cashwise-app
+  env_file:
+    - .env
+  environment:
+    DB_HOST: postgres
+    DB_PORT: 5432
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    AWS_ENDPOINT: http://seaweedfs:8333
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+  networks:
+    - cashwise
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-cashwise}
+      POSTGRES_USER: ${DB_USERNAME:-cashwise}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    ports:
+      - '${FORWARD_DB_PORT:-5432}:5432'
+    networks:
+      - cashwise
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-q', '-d', '${DB_DATABASE:-cashwise}', '-U', '${DB_USERNAME:-cashwise}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    command: --save 60 1 --loglevel warning
+    volumes:
+      - redis-data:/data
+    ports:
+      - '${FORWARD_REDIS_PORT:-6379}:6379'
+    networks:
+      - cashwise
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # All-in-one master + volume + filer + S3 gateway, which is all a
+  # single-node deployment needs.
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    command: >-
+      server
+      -dir=/data
+      -ip.bind=0.0.0.0
+      -master.volumeSizeLimitMB=1024
+      -s3
+      -s3.port=8333
+    volumes:
+      - seaweedfs-data:/data
+    ports:
+      - '${FORWARD_SEAWEEDFS_S3_PORT:-8333}:8333'
+      - '${FORWARD_SEAWEEDFS_FILER_PORT:-8888}:8888'
+    networks:
+      - cashwise
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1:9333/cluster/status']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # One-shot: SeaweedFS doesn't auto-create S3 buckets on first write, so this
+  # creates AWS_BUCKET via `weed shell` before anything tries to use the disk.
+  # Re-running against an existing bucket is a harmless no-op.
+  seaweedfs-init:
+    image: chrislusf/seaweedfs:latest
+    entrypoint: ['sh', '-c']
+    command:
+      - 'echo "s3.bucket.create -name=${AWS_BUCKET:-cashwise}" | weed shell -master=seaweedfs:9333 -filer=seaweedfs:8888'
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    networks:
+      - cashwise
+    restart: 'no'
+
+  # One-shot: runs migrations against the freshly built image, then exits.
+  # app/queue/scheduler/reverb all wait for it to finish successfully before
+  # they start, instead of every replica racing to migrate on boot.
+  migrate:
+    <<: *app
+    command: php artisan migrate --force
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweedfs-init:
+        condition: service_completed_successfully
+    restart: 'no'
+    healthcheck:
+      disable: true
+
+  app:
+    <<: *app
+    ports:
+      - '${APP_PORT:-8000}:8080'
+
+  queue:
+    <<: *app
+    command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+
+  scheduler:
+    <<: *app
+    command: php artisan schedule:work
+    healthcheck:
+      disable: true
+
+  # Reverb happens to answer HTTP on :8080 too, but not on /up - the image's
+  # baked-in HEALTHCHECK would "pass" on any non-404 response, which isn't a
+  # real signal, so it's disabled here rather than trusted.
+  reverb:
+    <<: *app
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    ports:
+      - '${REVERB_PORT:-8080}:8080'
+    healthcheck:
+      disable: true
+
+networks:
+  cashwise:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  seaweedfs-data:
