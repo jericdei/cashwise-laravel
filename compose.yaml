@@ -18,6 +18,7 @@ x-app: &app
             condition: service_healthy
     networks:
         - cashwise
+        - dokploy-network
     restart: unless-stopped
 
 services:
@@ -33,6 +34,7 @@ services:
             - '${FORWARD_DB_PORT:-5432}:5432'
         networks:
             - cashwise
+            - dokploy-network
         healthcheck:
             test:
                 [
@@ -58,6 +60,7 @@ services:
             - '${FORWARD_REDIS_PORT:-6379}:6379'
         networks:
             - cashwise
+            - dokploy-network
         healthcheck:
             test: ['CMD', 'redis-cli', 'ping']
             interval: 5s
@@ -83,6 +86,7 @@ services:
             - '${FORWARD_SEAWEEDFS_FILER_PORT:-8888}:8888'
         networks:
             - cashwise
+            - dokploy-network
         healthcheck:
             test:
                 [
@@ -111,6 +115,7 @@ services:
                 condition: service_healthy
         networks:
             - cashwise
+            - dokploy-network
         restart: 'no'
 
     # One-shot: runs migrations against the freshly built image, then exits.
@@ -159,6 +164,16 @@ services:
 networks:
     cashwise:
         driver: bridge
+    # Dokploy's shared Traefik network. Declared here (and attached to every
+    # service) because assigning a Domain to a service in Dokploy's UI can
+    # replace that service's network membership instead of adding to it -
+    # see https://github.com/Dokploy/dokploy/issues/3562. Putting every
+    # service on it ourselves means we don't depend on that behavior at all.
+    # For local dev this network must already exist: `just up`/`full` create
+    # it automatically; otherwise run `docker network create dokploy-network`
+    # once yourself.
+    dokploy-network:
+        external: true
 
 volumes:
     postgres-data:

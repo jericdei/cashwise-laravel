@@ -2,8 +2,13 @@
 default:
     @just --list
 
+# Dokploy creates this network on the server; locally we create it once ourselves,
+# since compose.yaml references it as external (see compose.yaml for why)
+_ensure-network:
+    @docker network inspect dokploy-network >/dev/null 2>&1 || docker network create dokploy-network
+
 # Start the local infrastructure services (Postgres, Redis, SeaweedFS)
-up:
+up: _ensure-network
     docker compose up -d postgres redis seaweedfs seaweedfs-init
 
 # Stop all running services
@@ -42,5 +47,5 @@ build:
     docker compose build app
 
 # Build and run the full containerized stack (app, queue, scheduler, reverb), prod-like
-full:
+full: _ensure-network
     docker compose up -d --build
