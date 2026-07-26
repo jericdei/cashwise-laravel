@@ -37,6 +37,12 @@ RUN npm ci
 
 COPY . .
 
+# public/frankenphp-worker.php is gitignored (Octane's own convention), so a
+# fresh git clone never has it. Octane would otherwise try to create it at
+# container boot, but by then we're the non-root www-data user and public/
+# is read-only to it - bake it in now, as root, instead.
+RUN cp vendor/laravel/octane/src/Commands/stubs/frankenphp-worker.php public/frankenphp-worker.php
+
 # composer dump-autoload (not the earlier install) is what triggers
 # package:discover, since it needs the full app/config to boot artisan.
 RUN composer dump-autoload --no-dev --optimize \
