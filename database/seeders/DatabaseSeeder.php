@@ -20,6 +20,10 @@ class DatabaseSeeder extends Seeder
         $roles = ERole::toArray();
 
         foreach ($roles as $role) {
+            if (Role::where('name', $role)->exists()) {
+                continue;
+            }
+
             Role::create([
                 'name' => $role,
                 'guard_name' => 'web',
