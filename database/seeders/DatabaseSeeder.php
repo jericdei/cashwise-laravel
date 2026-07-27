@@ -30,12 +30,12 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        /** @var User */
-        User::factory()->create([
+        User::create([
             'first_name' => 'Cashwise',
             'middle_name' => null,
             'last_name' => 'Admin',
             'email' => 'admin@cashwise.com',
+            'password' => bcrypt('password'),
         ])->assignRole(ERole::ADMIN->value);
     }
 }
