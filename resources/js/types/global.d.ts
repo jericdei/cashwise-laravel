@@ -1,4 +1,4 @@
-import type { Auth } from '@/types/auth';
+import type { Auth, Role } from '@/types/auth';
 
 declare module 'react' {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

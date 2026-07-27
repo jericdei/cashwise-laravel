@@ -60,4 +60,14 @@ class User extends Authenticatable implements PasskeyUser
                 ->join(' ')
         );
     }
+
+    public function dashboardRoute(): string
+    {
+        return match ($this->roles->first()->name) {
+            'admin' => 'admin.dashboard',
+            'employee' => 'employee.dashboard',
+            'employer' => 'employer.dashboard',
+            default => 'login',
+        };
+    }
 }

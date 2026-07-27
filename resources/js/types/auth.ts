@@ -1,9 +1,11 @@
-import { App } from '@/wayfinder/types';
+import type { App } from '@/wayfinder/types';
 
-type User = App.Models.User;
+export type User = App.Models.User;
+export type Role = App.Enums.Role;
 
 export type Auth = {
     user: User;
+    role: Role;
 };
 
 export type Passkey = {

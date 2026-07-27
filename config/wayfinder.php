@@ -32,7 +32,7 @@ return [
     ],
 
     'cache' => [
-        'enabled' => env('WAYFINDER_CACHE_ENABLED', false),
+        'enabled' => env('WAYFINDER_CACHE_ENABLED', true),
         'directory' => env('WAYFINDER_CACHE_DIRECTORY', storage_path('wayfinder-cache')),
     ],
 ];

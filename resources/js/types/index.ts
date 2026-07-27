@@ -1,4 +1,4 @@
-import { App } from '@/wayfinder/types';
+import type { App } from '@/wayfinder/types';
 
 export type * from './auth';
 export type * from './navigation';
