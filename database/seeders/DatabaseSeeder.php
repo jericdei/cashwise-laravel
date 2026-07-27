@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Role as ERole;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Role;
 
 class DatabaseSeeder extends Seeder
 {
@@ -15,11 +17,21 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $roles = ERole::toArray();
 
+        foreach ($roles as $role) {
+            Role::create([
+                'name' => $role,
+                'guard_name' => 'web',
+            ]);
+        }
+
+        /** @var User */
         User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+            'first_name' => 'Cashwise',
+            'middle_name' => null,
+            'last_name' => 'Admin',
+            'email' => 'admin@cashwise.com',
+        ])->assignRole(ERole::ADMIN->value);
     }
 }
